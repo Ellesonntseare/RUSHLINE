@@ -1,0 +1,49 @@
+{
+  "runner": "/assets/optimized/classic-meshopt.bin",
+  "skin": "/assets/optimized/street.bin",
+  "runnerCredit": "User-supplied Boy01 character and animation files; source/license to confirm before public release",
+  "runnerSource": null,
+  "runnerScale": 1,
+  "runnerYaw": 3.141592653589793,
+  "skinYaw": 3.141592653589793,
+  "skinScale": 1,
+  "animations": null,
+  "track": "/assets/track/track-single-detailed.glb",
+  "train": "/assets/optimized/train-fast.bin",
+  "barrier": "/assets/barrier/construction-barrier.glb",
+  "building": "/assets/optimized/facade-fast.bin",
+  "sky": "/assets/sky/kloppenheim_03_puresky_1k.bin",
+  "cityProps": {
+    "hydrant": "/assets/city-props/fire_hydrant/fire_hydrant.gltf",
+    "trash": "/assets/city-props/metal_trash_can/metal_trash_can.gltf",
+    "seating": "/assets/city-props/modular_street_seating/modular_street_seating.gltf"
+  },
+  "routeProps": {
+    "stationBench": "/assets/optimized/painted_wooden_bench.bin",
+    "stationLamp": "/assets/optimized/industrial_wall_sconce.bin",
+    "tunnelPipes": "/assets/optimized/modular_industrial_pipes_01.bin",
+    "concreteBarrier": "/assets/optimized/concrete_road_barrier_02.bin"
+  },
+  "ground": {
+    "asphalt_02_diff": "/assets/ground/asphalt_02_diff.webp",
+    "asphalt_02_normal": "/assets/ground/asphalt_02_normal.webp",
+    "asphalt_02_rough": "/assets/ground/asphalt_02_rough.webp",
+    "concrete_pavement_02_diff": "/assets/ground/concrete_pavement_02_diff.webp",
+    "concrete_pavement_02_normal": "/assets/ground/concrete_pavement_02_normal.webp",
+    "concrete_pavement_02_rough": "/assets/ground/concrete_pavement_02_rough.webp"
+  },
+  "runnerClips": {
+    "Run": "/assets/optimized/classic-meshopt.bin",
+    "Jump": "/assets/optimized/jump.json",
+    "Roll": "/assets/optimized/roll.json"
+  },
+  "finishDances": [
+    "/assets/user-dances/hip-hop-dancing.json",
+    "/assets/user-dances/twist-dance.json",
+    "/assets/user-dances/silly-dancing.json",
+    "/assets/user-dances/bboy-uprock-start.json",
+    "/assets/user-dances/breakdance-freeze-var-2.json"
+  ],
+  "coin": "/assets/optimized/coin-fast.bin",
+  "mystery": "/assets/optimized/mystery-fast.bin"
+}

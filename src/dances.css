@@ -1,0 +1,40 @@
+.finish-celebration {
+  position: fixed;
+  z-index: 7;
+  left: 50%;
+  top: 14%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-align: center;
+  color: #f9c867;
+  text-shadow: 0 5px 30px #080f1a;
+  font: 900 clamp(65px, 10vw, 145px)/.85 'Barlow Condensed', Impact, sans-serif;
+  letter-spacing: .04em;
+}
+.finish-celebration small {
+  display: block;
+  margin-top: 12px;
+  color: #f5f6f8;
+  font: 900 12px Manrope, sans-serif;
+  letter-spacing: .35em;
+}
+.skin-select {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: min(320px,100%);
+  margin-top: 24px;
+  color: #f3c874;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+.skin-select select {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ffffff4d;
+  background: #152234;
+  color: #f5f6f8;
+  font: 800 12px Manrope, sans-serif;
+  letter-spacing: .1em;
+}

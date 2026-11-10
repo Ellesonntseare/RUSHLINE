@@ -1,0 +1,13 @@
+.menu{overflow-y:auto}.daily-summary{display:flex;align-items:center;gap:13px;width:100%;max-width:660px;margin-top:16px;padding:12px 15px;border:1px solid #f9c86766;background:linear-gradient(100deg,#1f2d3bcf,#0b1521d9);color:#f5f6f8;text-align:left;letter-spacing:.09em;transition:border-color .15s,transform .15s}
+.daily-summary:hover{border-color:#f9c867;transform:translateY(-2px)}
+.daily-summary-icon{display:grid;place-items:center;width:32px;height:32px;flex:none;background:#f9c867;color:#07101b;font-size:20px}
+.daily-summary strong,.daily-summary small{display:block}.daily-summary strong{font-size:10px;font-weight:900}.daily-summary small{margin-top:4px;font-size:9px;color:#b9c7d6;font-weight:800}
+.daily-wallet{margin-left:auto;color:#f9c867;font-size:10px;font-weight:900;white-space:nowrap}.daily-summary>span:last-child{font-size:20px;color:#f9c867}
+.daily-content{max-width:580px;max-height:min(90vh,760px);overflow:auto;gap:14px}.daily-content h2{margin-bottom:0}.daily-content .daily-intro{margin:0;font-size:12px;line-height:1.6}
+.daily-challenge-list{width:100%;display:grid;gap:10px}.daily-challenge{padding:13px 15px;border:1px solid #ffffff29;background:#101f30;display:grid;gap:8px}.daily-challenge.is-complete{border-color:#f9c8678a;background:#202b2d}
+.daily-challenge-top,.daily-challenge-foot,.daily-balance{display:flex;align-items:center;justify-content:space-between;gap:12px}.daily-challenge h3{font:900 20px/1 'Barlow Condensed',sans-serif;letter-spacing:.05em;margin:0}.daily-challenge .reward{font-size:10px;font-weight:900;color:#f9c867;white-space:nowrap}.daily-challenge-track{height:4px;background:#ffffff27}.daily-challenge-track span{display:block;height:100%;background:#f9c867}.daily-challenge-foot{font-size:10px;font-weight:800;color:#b9c7d6}.daily-challenge.is-complete .daily-challenge-foot strong{color:#91e9ba}
+.daily-balance{width:100%;padding:12px 0;border-top:1px solid #ffffff2a;color:#b9c7d6;font-size:10px;font-weight:900;letter-spacing:.12em}.daily-balance strong{color:#f9c867;font:900 28px/1 'Barlow Condensed',sans-serif}
+.daily-run-result{margin:0!important;color:#f9c867!important;font-size:12px;font-weight:800}
+@media(max-width:750px){.daily-summary{margin-top:10px;padding:9px 11px;gap:9px}.daily-summary-icon{width:27px;height:27px}.daily-wallet{font-size:9px}.daily-content{padding:22px;gap:12px}.daily-content h2{font-size:36px}.daily-challenge{padding:11px 12px}}
+@media(max-width:380px){.daily-wallet{white-space:normal;text-align:right;max-width:75px}}
+@media(max-height:800px) and (min-width:751px){.menu{padding-top:50px;padding-bottom:45px}.menu h1{font-size:clamp(70px,9vw,135px);margin:15px 0 20px}.menu-actions{margin-top:18px}.menu-rule{margin:16px 0 10px}}

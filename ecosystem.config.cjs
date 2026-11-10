@@ -1,0 +1,9 @@
+module.exports={
+  apps:[{
+    name:'rushline',
+    script:'./node_modules/vite/bin/vite.js',
+    args:['--host','0.0.0.0','--port','5174','--strictPort'],
+    cwd:__dirname,
+    autorestart:true
+  }]
+};

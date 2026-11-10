@@ -1,0 +1,268 @@
+import './style.css';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
+import { LANES, DEFAULT_SPEED, MAX_DISTANCE, clamp, nextLane, createObstacles, hitsObstacle, runStep } from './logic.js';
+
+const byId=(id)=>document.getElementById(id);
+const panels=['menu','loading','setup','pauseScreen','gameover'];
+function showPanel(name){for(const panel of panels)byId(panel).classList.toggle('hidden',panel!==name);}
+function setHud(show){byId('hud').classList.toggle('hidden',!show);byId('pauseBtn').classList.toggle('hidden',!show);}
+function message(text){byId('loadingMessage').textContent=text;}
+let qualityIndex=0;
+const qualities=['AUTO','HIGH','PERFORMANCE'];
+byId('settingsBtn').addEventListener('click',()=>{qualityIndex=(qualityIndex+1)%3;byId('qualityLabel').textContent=qualities[qualityIndex];if(engine)engine.setQuality(qualityIndex);});
+
+const loader=new GLTFLoader();
+let engine=null;
+async function loadSceneModels(){
+  const response=await fetch(`/assets/manifest.json?bust=${Date.now()}`,{cache:'no-store'});
+  if(!response.ok)throw new Error('Missing asset manifest. See README.md.');
+  const manifest=await response.json();
+  const required=['runner','track','train','barrier','building'];
+  const missing=required.filter((key)=>!manifest[key]);
+  if(missing.length)throw new Error(`Missing real model assets: ${missing.join(', ')}. See README.md for the asset import commands.`);
+  const uniqueKeys=[...required,...(manifest.animations?['animations']:[])];
+  const results={};
+  for(let i=0;i<uniqueKeys.length;i++){
+    const key=uniqueKeys[i];message(`Loading ${key} model…`);
+    byId('loadingBar').style.width=`${Math.round(i/uniqueKeys.length*100)}%`;
+    results[key]=await loader.loadAsync(manifest[key]);
+  }
+  const clips=[...results.runner.animations,...(results.animations?.animations||[])];
+  const names=clips.map((a)=>a.name);
+  if(!clips.length || !names.some((s)=>/run|sprint|jog/i.test(s))){
+    throw new Error(`The character has no real running animation. Add a Quaternius Universal Animation Library GLB via --animations. Found: ${names.join(', ')||'none'}`);
+  }
+  byId('loadingBar').style.width='100%';
+  return {manifest,models:results,clips};
+}
+
+class RunnerEngine {
+  constructor({manifest,models,clips}){
+    this.manifest=manifest;this.models=models;this.clips=clips;
+    this.clock=new THREE.Clock();this.scene=new THREE.Scene();
+    this.scene.background=new THREE.Color('#101b2a');
+    this.scene.fog=new THREE.FogExp2(0x111b29,.012);
+    this.camera=new THREE.PerspectiveCamera(61,innerWidth/innerHeight,.08,240);
+    this.renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',alpha:false});
+    this.renderer.outputColorSpace=THREE.SRGBColorSpace;
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure=1.2;
+    this.renderer.shadowMap.enabled=true;
+    this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    this.renderer.setSize(innerWidth,innerHeight);
+    byId('viewport').appendChild(this.renderer.domElement);
+    const sky=new THREE.HemisphereLight(0xd9e8fc,0x243149,2.1);this.scene.add(sky);
+    const sun=new THREE.DirectionalLight(0xffd4a2,3.0);
+    sun.position.set(-17,40,-27);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+    sun.shadow.camera.left=-20;sun.shadow.camera.right=20;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-25;
+    sun.shadow.camera.near=1;sun.shadow.camera.far=110;sun.shadow.bias=-.0005;
+    sun.target.position.set(0,0,-20);this.scene.add(sun,sun.target);this.sun=sun;
+    this.world=new THREE.Group();this.scene.add(this.world);
+    this.trackGroup=new THREE.Group();this.world.add(this.trackGroup);
+    this.cityGroup=new THREE.Group();this.world.add(this.cityGroup);
+    this.obstacleGroup=new THREE.Group();this.world.add(this.obstacleGroup);
+    this.trackTiles=new Map();this.cityTiles=new Map();this.obstacleMeshes=new Map();
+    this.player=cloneSkeleton(models.runner.scene);
+    this.world.add(this.player);
+    const playerB=new THREE.Box3().setFromObject(this.player);
+    const size=playerB.getSize(new THREE.Vector3());
+    if(size.y<=.001)throw new Error('The runner asset has no visible geometry. Use a rigged GLB/glTF character.');
+    this.playerModelScale=(manifest.runnerScale||1)*1.85/size.y;
+    this.player.scale.setScalar(this.playerModelScale);
+    this.runnerGround=-playerB.min.y*this.playerModelScale;
+    this.player.rotation.y=manifest.runnerYaw??0;
+    this.player.traverse((o)=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
+    this.mixer=new THREE.AnimationMixer(this.player);
+    this.actions=new Map();
+    for(const clip of clips){if(!this.actions.has(clip.name))this.actions.set(clip.name,this.mixer.clipAction(clip));}
+    this.animNames={run:this.findClip(['run','sprint','jog']),jump:this.findClip(['jump']),slide:this.findClip(['slide','crouch','roll']),hit:this.findClip(['hit','stumble'])};
+    if(!this.animNames.run)throw new Error('Imported animation GLB contains no Run/Jog/Sprint clip.');
+    this.state=null;this.isPlaying=false;this.paused=false;this.lastAnim=null;
+    this.trackTemplate=this.processModel(models.track.scene,manifest.trackScale||1,2.55,'width');
+    this.trainTemplate=this.processModel(models.train.scene,manifest.trainScale||1,2.55,'width');
+    this.barrierTemplate=this.processModel(models.barrier.scene,manifest.barrierScale||1,2.30,'width');
+    this.buildingTemplate=this.processModel(models.building.scene,manifest.buildingScale||1,12,'height');
+    const bounds=new THREE.Box3().setFromObject(this.trackTemplate).getSize(new THREE.Vector3());
+    this.trackSpacing=clamp(bounds.z,1.7,18);
+    this.installInputs();
+    this.setQuality(qualityIndex);
+    window.addEventListener('resize',()=>this.resize());
+    this.animate=()=>{requestAnimationFrame(this.animate);this.tick(this.clock.getDelta());this.renderer.render(this.scene,this.camera);};
+    this.animate();
+  }
+  findClip(candidates){for(const match of candidates){const name=[...this.actions.keys()].find(n=>new RegExp(`(^|[ _.-])${match}([ _.-]|$)`,'i').test(n))||[...this.actions.keys()].find(n=>n.toLowerCase().includes(match));if(name)return name;}return null;}
+  processModel(scene,extraScale,target,by){
+    const root=scene.clone(true);const box=new THREE.Box3().setFromObject(root),size=box.getSize(new THREE.Vector3());
+    const divider=by==='height'?size.y:size.x;
+    if(divider<=.0001)throw new Error('An imported 3D model has invalid dimensions. Check selected glTF/GLB files.');
+    const scale=target/divider*extraScale;root.scale.multiplyScalar(scale);
+    root.position.set(-(box.min.x+size.x/2)*scale,-box.min.y*scale,-(box.min.z+size.z/2)*scale);
+    root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+    return root;
+  }
+  setQuality(index){
+    const dpr=index===1?Math.min(devicePixelRatio,2):index===2?Math.min(devicePixelRatio,1):Math.min(devicePixelRatio,1.5);
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.shadowMap.enabled=index!==2;
+    this.resize();
+  }
+  resize(){this.camera.aspect=innerWidth/innerHeight;this.camera.fov=innerWidth<700?76:61;this.camera.updateProjectionMatrix();this.renderer.setSize(innerWidth,innerHeight);}
+  playAnimation(name,once=false){
+    if(!name || this.lastAnim===name)return;
+    const prev=this.lastAnim?this.actions.get(this.lastAnim):null;
+    const next=this.actions.get(name);if(!next)return;
+    next.reset();next.enabled=true;next.setEffectiveWeight(1);next.setEffectiveTimeScale(1);
+    next.setLoop(once?THREE.LoopOnce:THREE.LoopRepeat);next.clampWhenFinished=once;
+    if(prev && prev!==next)next.crossFadeFrom(prev,.2,true);
+    next.play();this.lastAnim=name;
+  }
+  start(){
+    this.state={lane:1,z:0,distance:0,speed:DEFAULT_SPEED,recovery:0,airborneHeight:0,verticalSpeed:0};
+    this.slideRemaining=0;this.hitCooldown=0;this.targetX=LANES[1];
+    this.pattern=createObstacles(21032026,95);
+    for(const mesh of this.obstacleMeshes.values())this.obstacleGroup.remove(mesh);
+    this.obstacleMeshes.clear();
+    for(const t of this.trackTiles.values())this.trackGroup.remove(t);
+    this.trackTiles.clear();
+    for(const t of this.cityTiles.values())this.cityGroup.remove(t);
+    this.cityTiles.clear();
+    this.player.position.set(0,this.runnerGround,0);
+    this.camera.position.set(0,3.4,8.9);this.camera.lookAt(0,1.8,-9);
+    this.playAnimation(this.animNames.run);
+    this.isPlaying=true;this.paused=false;
+    this.clock.getDelta();this.updateWorld();this.updateHud();
+  }
+  installInputs(){
+    window.addEventListener('keydown',(event)=>{
+      if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(event.code))event.preventDefault();
+      if(event.repeat)return;
+      if(event.code==='Escape'){if(this.isPlaying)this.pause(!this.paused);return;}
+      if(!this.isPlaying||this.paused)return;
+      if(['ArrowLeft','KeyA'].includes(event.code))this.switchLane(-1);
+      if(['ArrowRight','KeyD'].includes(event.code))this.switchLane(1);
+      if(['Space','ArrowUp','KeyW'].includes(event.code))this.jump();
+      if(['ArrowDown','KeyS'].includes(event.code))this.slide();
+    });
+    let start=null;
+    this.renderer.domElement.addEventListener('pointerdown',e=>{start={x:e.clientX,y:e.clientY};});
+    this.renderer.domElement.addEventListener('pointerup',e=>{
+      if(!this.isPlaying||this.paused||!start)return;
+      const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;
+      if(Math.max(Math.abs(dx),Math.abs(dy))<28)return;
+      if(Math.abs(dx)>Math.abs(dy))this.switchLane(dx>0?1:-1);
+      else if(dy<0)this.jump();else this.slide();
+    });
+    this.renderer.domElement.addEventListener('pointercancel',()=>start=null);
+  }
+  switchLane(direction){this.state.lane=nextLane(this.state.lane,direction);this.targetX=LANES[this.state.lane];}
+  jump(){if(this.state.airborneHeight>.05||this.state.verticalSpeed>0)return;this.state.verticalSpeed=8.25;this.slideRemaining=0;if(this.animNames.jump)this.playAnimation(this.animNames.jump,true);}
+  slide(){if(this.state.airborneHeight>.05)return;this.slideRemaining=.8;if(this.animNames.slide)this.playAnimation(this.animNames.slide,true);}
+  pause(value){this.paused=value;showPanel(value?'pauseScreen':null);this.clock.getDelta();}
+  finish(){
+    this.isPlaying=false;
+    const meters=Math.floor(this.state.distance);
+    const best=Number(localStorage.getItem('rushline-best')||0);
+    if(meters>best)localStorage.setItem('rushline-best',String(meters));
+    byId('resultDistance').textContent=meters.toLocaleString();
+    byId('resultBest').textContent=meters>best?'NEW PERSONAL BEST':'KEEP PUSHING YOUR LIMITS';
+    setHud(false);showPanel('gameover');
+  }
+  updateWorld(){
+    const index=Math.floor(this.state.distance/this.trackSpacing);
+    const needed=new Set();
+    for(let i=Math.max(0,index-5);i<=index+32;i++){
+      needed.add(i);
+      if(!this.trackTiles.has(i)){
+        const group=new THREE.Group();
+        for(const x of LANES){const segment=this.trackTemplate.clone(true);segment.position.x=x;group.add(segment);}
+        group.position.z=-i*this.trackSpacing;
+        this.trackGroup.add(group);this.trackTiles.set(i,group);
+      }
+    }
+    for(const [i,obj] of this.trackTiles)if(!needed.has(i)){this.trackGroup.remove(obj);this.trackTiles.delete(i);}
+    const cityIndex=Math.floor(this.state.distance/16);
+    const cityNeeded=new Set();
+    for(let i=Math.max(0,cityIndex-3);i<=cityIndex+11;i++){
+      cityNeeded.add(i);
+      if(!this.cityTiles.has(i)){
+        const group=new THREE.Group();
+        for(const side of [-1,1]){
+          const building=this.buildingTemplate.clone(true);
+          building.position.set(side*(13.5+(i%3)*1.6),0,0);
+          building.rotation.y=side===1?Math.PI:0;
+          group.add(building);
+        }
+        group.position.z=-i*16-12;this.cityGroup.add(group);this.cityTiles.set(i,group);
+      }
+    }
+    for(const [i,obj] of this.cityTiles)if(!cityNeeded.has(i)){this.cityGroup.remove(obj);this.cityTiles.delete(i);}
+    for(const obstacle of this.pattern){
+      if(obstacle.distance<this.state.distance-12){if(this.obstacleMeshes.has(obstacle.id)){this.obstacleGroup.remove(this.obstacleMeshes.get(obstacle.id));this.obstacleMeshes.delete(obstacle.id);}continue;}
+      if(obstacle.distance>this.state.distance+115)break;
+      if(!this.obstacleMeshes.has(obstacle.id)){
+        const mesh=(obstacle.type==='train'?this.trainTemplate:this.barrierTemplate).clone(true);
+        mesh.position.set(LANES[obstacle.lane],0,obstacle.z);
+        this.obstacleGroup.add(mesh);this.obstacleMeshes.set(obstacle.id,mesh);
+      }
+    }
+  }
+  updateHud(){const dist=Math.floor(this.state.distance);byId('distance').textContent=String(dist).padStart(4,'0');byId('best').textContent=String(Math.max(dist,Number(localStorage.getItem('rushline-best')||0))).padStart(4,'0');byId('progressBar').style.width=`${Math.min(100,dist/MAX_DISTANCE*100)}%`;}
+  tick(rawDelta){
+    if(!this.isPlaying||this.paused)return;
+    const delta=Math.min(rawDelta,.05);
+    this.hitCooldown=Math.max(0,this.hitCooldown-delta);
+    this.slideRemaining=Math.max(0,this.slideRemaining-delta);
+    const previousAir=this.state.airborneHeight;
+    this.state=runStep(this.state,delta);
+    if(this.state.airborneHeight===0 && previousAir>0) this.playAnimation(this.animNames.run);
+    if(this.slideRemaining===0 && this.lastAnim===this.animNames.slide)this.playAnimation(this.animNames.run);
+    if(this.state.recovery===0 && this.lastAnim===this.animNames.hit)this.playAnimation(this.animNames.run);
+    this.player.position.x=THREE.MathUtils.damp(this.player.position.x,this.targetX,12,delta);
+    this.player.position.y=this.runnerGround+this.state.airborneHeight;
+    // A subtle procedural duck while a rig-specific slide animation is unavailable.
+    this.player.scale.y=THREE.MathUtils.damp(this.player.scale.y, this.slideRemaining>0&&!this.animNames.slide?this.playerModelScale*.73:this.playerModelScale, 13, delta);
+    this.player.position.z=this.state.z;
+    this.mixer.update(delta);
+    for(const obs of this.pattern){
+      if(obs.distance<this.state.distance-5)continue;
+      if(obs.distance>this.state.distance+6)break;
+      if(!this.hitCooldown&&hitsObstacle(this.state,obs)){
+        obs.hit=true;this.state.recovery=1.6;this.hitCooldown=1.5;
+        if(this.animNames.hit)this.playAnimation(this.animNames.hit,true);
+        byId('toast').textContent='COLLISION  ·  SPEED LOST';byId('toast').classList.remove('hidden');
+        setTimeout(()=>byId('toast').classList.add('hidden'),1100);
+      }
+    }
+    this.updateWorld();this.updateHud();
+    const targetCamX=this.player.position.x*.27;
+    const focus=new THREE.Vector3(this.player.position.x*.57,1.6,this.player.position.z-11);
+    this.camera.position.x=THREE.MathUtils.damp(this.camera.position.x,targetCamX,4,delta);
+    this.camera.position.y=THREE.MathUtils.damp(this.camera.position.y,3.9+this.state.airborneHeight*.14,3,delta);
+    this.camera.position.z=THREE.MathUtils.damp(this.camera.position.z,this.player.position.z+8.3,5,delta);
+    this.camera.lookAt(focus);
+    this.sun.position.z=this.player.position.z-22;
+    this.sun.target.position.z=this.player.position.z-20;
+    if(this.state.distance>=MAX_DISTANCE)this.finish();
+  }
+}
+
+async function begin(){
+  try{
+    setHud(false);showPanel('loading');
+    if(!engine)engine=new RunnerEngine(await loadSceneModels());
+    engine.start();showPanel(null);setHud(true);
+  }catch(error){
+    console.error('RUSHLINE cannot launch:',error);
+    byId('setupMessage').textContent=error.message||'Model loading failed. Check the browser console and asset file paths.';
+    showPanel('setup');
+  }
+}
+byId('playBtn').addEventListener('click',begin);
+byId('againBtn').addEventListener('click',begin);
+byId('setupDismiss').addEventListener('click',()=>showPanel('menu'));
+byId('pauseBtn').addEventListener('click',()=>engine?.pause(true));
+byId('resumeBtn').addEventListener('click',()=>engine?.pause(false));
+byId('endBtn').addEventListener('click',()=>{if(engine)engine.isPlaying=false;setHud(false);showPanel('menu');});
+byId('homeBtn').addEventListener('click',()=>showPanel('menu'));

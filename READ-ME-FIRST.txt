@@ -1,0 +1,11 @@
+RUSHLINE PHASE 1 INSTALLER REPAIR v0.1.2
+
+IMPORTANT: Extract this ZIP to your runner parent folder, so the files merge into your existing RUSHLINE-Phase-1 directory.
+Do not extract the game folder inside itself. Do NOT delete public\assets -- your tracks, buildings and trains are already installed there.
+
+Run START-RUSHLINE.bat. It will try the GitHub API, CDN, and raw mirror for the animated runner.
+If every mirror fails, open:
+https://github.com/rana-jatin/avatar-stage/blob/main/demo/public/models/demo-avatar.glb
+Click Download raw file. Drag the resulting .glb onto IMPORT-RUNNER.bat, then run START-RUSHLINE.bat.
+
+The ZIP DOES NOT bundle the GLB binary. The imported rig is CC0 but low-poly and is temporary pending a premium character upgrade.

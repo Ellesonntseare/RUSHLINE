@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#060c16" />
+  <title>RUSHLINE</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <div id="viewport" aria-label="RUSHLINE 3D running game"></div>
+    <div class="visual-vignette" aria-hidden="true"></div>
+    <div class="scanline" aria-hidden="true"></div>
+    <header class="topbar">
+      <button id="pauseBtn" class="icon-btn hidden" aria-label="Pause game">Ⅱ</button>
+    </header>
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="metric"><span class="eyebrow">DISTANCE</span><span class="value"><span id="distance">0000</span><small>M</small></span></div>
+      <div class="metric metric-right"><span class="eyebrow">BEST RUN</span><span class="value"><span id="best">0000</span><small>M</small></span></div>
+      <div class="track-progress"><span></span><div id="progressBar"></div><span></span></div>
+      <div class="coin-counter"><span class="eyebrow">COINS</span><strong id="coinCount">0</strong></div>
+      <div id="magnetStatus" class="magnet-status hidden">MAGNET 0s</div>
+      <div id="streak" class="streak hidden">NICE SAVE <b>+100</b></div>
+      <div id="mobileControls" class="mobile-controls"><div class="control-hint"><span>↖ SWIPE TO DODGE ↗</span><span>↑ JUMP · ↓ ROLL</span></div></div>
+      <div id="toast" class="toast hidden"></div>
+      <div id="hazardHint" class="hazard-hint hidden"></div>
+    </section>
+    <main id="menu" class="menu">
+      <div class="menu-content">
+        <div class="overline"><span class="overline-line"></span> BUILT FOR THE CHASE <span class="edition">01 / 04</span></div>
+        <h1>NO TIME<br /><em>TO STOP.</em></h1>
+        <p class="menu-copy">One city. Three lanes. No second chances.<br />A new generation of high-speed urban running.</p>
+        <select id="skinPicker" class="hidden" tabindex="-1" aria-hidden="true"><option value="classic">CLASSIC RUNNER</option><option value="street">STREET RUNNER</option><option value="urban">CITY RUNNER</option></select>
+        <section class="character-selector" aria-label="Choose your character"><div class="character-heading"><span>CHOOSE YOUR CHARACTER</span><h2 id="characterName" aria-live="polite">CLASSIC RUNNER</h2></div><div id="characterPreview" class="character-preview" role="group" aria-label="3D character view. Use the arrows to switch or drag the model to rotate it."><span id="previewLabel">LOADING RUNNER…</span><button id="previousCharacter" class="character-arrow character-arrow-left" type="button" aria-label="Previous character">‹</button><button id="nextCharacter" class="character-arrow character-arrow-right" type="button" aria-label="Next character">›</button><span class="character-instructions">← → SWITCH · DRAG TO ROTATE</span></div></section>
+        <div class="menu-actions"><button id="playBtn" class="play-btn"><span>START SOLO RUN</span><span class="button-arrow">↗</span></button><button id="multiplayerBtn" class="secondary-btn">RACE WITH FRIENDS</button><button id="settingsBtn" class="secondary-btn">GRAPHICS <span id="qualityLabel">AUTO</span></button></div>
+        <div class="menu-discovery"><button id="dailySummaryBtn" class="daily-summary" type="button"><span class="daily-summary-icon">✦</span><span><strong>DAILY CHALLENGES</strong><small id="dailySummaryText">0 / 3 COMPLETE</small></span><span id="dailyWallet" class="daily-wallet">0 COINS</span><span aria-hidden="true">↗</span></button><button id="shopBtn" class="shop-menu-button" type="button"><span>RUNNER SHOP</span><strong>SHOP ↗</strong></button></div>
+        <button id="installApp" class="install-app" type="button">INSTALL ON PHONE</button><p id="installHelp" class="install-help" role="status" hidden></p>
+      <div class="menu-rule"></div>
+        <div class="quick-meta"><span><b>01</b> DYNAMIC TRACK</span><span><b>02</b> ANIMATED RUNNER</span><span><b>03</b> PHYSICS + COLLISIONS</span></div>
+      </div>
+    </main>
+    <section id="dailyPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dailyTitle"><div class="modal-content daily-content">
+      <span class="eyebrow">THREE GOALS · NEW EACH DAY</span><h2 id="dailyTitle">TODAY'S CHALLENGES.</h2>
+      <p class="daily-intro">Run solo to make progress. Each completed goal awards bonus coins automatically.</p>
+      <div id="dailyChallengeList" class="daily-challenge-list"></div>
+      <div class="daily-balance"><span>COIN BALANCE</span><strong id="dailyBalance">0</strong></div>
+      <button id="dailyClose" class="secondary-btn" type="button">BACK TO MENU</button>
+    </div></section>
+    <section id="shopPanel" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shopTitle"><div class="modal-content shop-content">
+      <div class="shop-heading"><div><span class="eyebrow">EARN COINS · OWN THE LOOK</span><h2 id="shopTitle">RUNNER SHOP.</h2></div><div class="shop-balance"><span>YOUR COINS</span><strong id="shopBalance">0</strong></div></div>
+      <div class="shop-layout"><div id="shopItems" class="shop-items" role="list" aria-label="Shop items"></div><div class="shop-detail"><div id="shopPreview" class="shop-preview" role="img" aria-label="3D preview of the selected shop item"><span id="shopPreviewLabel">SELECT AN ITEM</span></div><span id="shopCategory" class="eyebrow"></span><h3 id="shopItemName"></h3><p id="shopItemDescription"></p><button id="shopAction" class="play-btn" type="button" disabled>SELECT AN ITEM</button><p id="shopMessage" role="status"></p></div></div>
+      <div class="shop-defaults"><button id="shopDefaultBoard" class="secondary-btn" type="button">STANDARD BOARD</button><button id="shopRandomDance" class="secondary-btn" type="button">RANDOM FINISH DANCE</button></div>
+      <button id="shopClose" class="secondary-btn" type="button">BACK TO MENU</button>
+    </div></section>
+    <section id="rooms" class="modal hidden"><div class="modal-content room-content">
+      <span class="eyebrow">PRIVATE SPRINT · 600 METRES</span><h2>BRING YOUR CREW.</h2>
+      <div id="roomEntry"><label for="runnerName">YOUR NAME</label><input id="runnerName" maxlength="18" value="Runner" autocomplete="nickname" />
+      <button id="createRoom" class="play-btn">CREATE ROOM <span>↗</span></button>
+      <div class="join-row"><input id="roomCodeInput" aria-label="Room code" maxlength="6" placeholder="ROOM CODE" /><button id="joinRoom" class="secondary-btn">JOIN</button></div></div>
+      <div id="roomLobby" class="hidden"><span class="eyebrow">SHARE THIS ROOM CODE</span><strong id="roomCode"></strong><p id="roomHint">Up to four runners. Everyone must be ready.</p><ol id="roomPlayers"></ol>
+      <button id="readyBtn" class="secondary-btn">I'M READY</button><button id="startRace" class="play-btn">START RACE ↗</button></div>
+      <p id="roomError" role="status"></p><button id="leaveRoom" class="secondary-btn">BACK TO MENU</button>
+    </div></section>
+    <div id="raceBoard" class="race-board hidden"><span class="eyebrow">LIVE STANDINGS</span><ol id="racePlayers"></ol><button id="leaveRace" class="secondary-btn">LEAVE RACE</button></div>
+    <div id="countdown" class="countdown hidden" role="status"></div>
+    <div id="finishCelebration" class="finish-celebration hidden" role="status">GOAL! <small>FINISH DANCE</small></div>
+    <section id="raceResults" class="modal hidden"><div class="modal-content"><span class="eyebrow">PRIVATE SPRINT</span><h2>RACE COMPLETE.</h2><ol id="finishOrder"></ol><button id="raceHome" class="play-btn">BACK TO MENU ↗</button></div></section>
+    <section id="loading" class="modal hidden" role="status"><div class="modal-content"><span class="eyebrow">INITIALIZING RUNNER</span><h2>GETTING READY</h2><div class="loading-track"><div id="loadingBar"></div></div><p id="loadingMessage">Loading real 3D assets…</p></div></section>
+    <section id="setup" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="setupTitle"><div class="modal-content setup-content"><span class="eyebrow">LOADING INTERRUPTED</span><h2 id="setupTitle">LET'S TRY THAT AGAIN.</h2><p id="setupMessage">A game file could not be loaded. Please try again.</p><button id="setupRetry" class="play-btn">RETRY LOADING <span>↗</span></button><button id="setupDismiss" class="secondary-btn">BACK TO MENU</button></div></section>
+    <section id="pauseScreen" class="modal hidden"><div class="modal-content"><span class="eyebrow">SESSION PAUSED</span><h2>TAKE YOUR TIME.</h2><button id="resumeBtn" class="play-btn">RESUME <span>↗</span></button><button id="endBtn" class="secondary-btn">END RUN</button></div></section>
+    <section id="gameover" class="modal hidden"><div class="modal-content"><span class="eyebrow">RUN COMPLETE</span><h2>BACK ON THE TRACK.</h2><p class="result-number"><span id="resultDistance">0</span><small> METERS</small></p><p id="resultBest">A new personal best.</p><p id="dailyRunResult" class="daily-run-result">Today's challenges are waiting.</p><button id="againBtn" class="play-btn">RUN AGAIN <span>↗</span></button><button id="homeBtn" class="secondary-btn">MAIN MENU</button></div></section>
+    <div class="bottom-info"><span>RUSHLINE / BUILD 0.2</span><span class="desktop-tip">A / D CHANGE LANE &nbsp; · &nbsp; SPACE JUMP &nbsp; · &nbsp; S / ↓ ROLL</span><span>1–4 RUNNERS · <a href="/ASSET-CREDITS.md" target="_blank" rel="noopener">ASSET CREDITS</a></span></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
